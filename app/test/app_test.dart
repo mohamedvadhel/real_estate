@@ -23,6 +23,7 @@ void main() {
     test('virgule, espaces et calculs', () {
       expect(parseNum('12,5'), 12.5);
       expect(parseNum('12 500'), 12500);
+      expect(parseNum(numToInput(12500.5)), 12500.5);
       expect(parseNum('3x50 + 20'), 170);
       expect(parseNum('3*50-5'), 145);
       expect(parseNum('abc'), isNull);
@@ -30,8 +31,8 @@ void main() {
     });
 
     test('formatage', () {
-      expect(fmtMoney(1234567.5), '1 234 567,5 MRU');
-      expect(fmtNum(-1500), '-1 500');
+      expect(fmtMoney(1234567.5), '1\u00A0234\u00A0567,5 MRU');
+      expect(fmtNum(-1500), '-1\u00A0500');
       expect(fmtQty(2.25, 'kg'), '2,25 kg');
     });
   });
@@ -47,7 +48,13 @@ void main() {
   test('valorisation complète de la boutique', () async {
     // Stock
     final riz = await repo.saveProduct(
-        name: 'Riz', unitId: 'u-kg', purchasePrice: 30, salePrice: 35, qty: 500, category: 'Alimentation');
+      name: 'Riz',
+      unitId: 'u-kg',
+      purchasePrice: 30,
+      salePrice: 35,
+      qty: 500,
+      category: 'Alimentation',
+    );
     await repo.saveProduct(name: 'Huile', unitId: 'u-l', purchasePrice: 80, salePrice: 90, qty: 40);
     await repo.saveProduct(name: 'Savon', unitId: 'u-piece', qty: 10); // sans prix
     // Mouvements : vente de 20 kg, puis inventaire à 470 kg
@@ -58,10 +65,19 @@ void main() {
     expect((await repo.stockMovements(riz)).length, 3);
 
     // Dettes
-    final ali = await repo.saveParty(name: 'Ali', kind: 'client', initialKind: 'credit', initialAmount: 5000);
+    final ali = await repo.saveParty(
+      name: 'Ali',
+      kind: 'client',
+      initialKind: 'credit',
+      initialAmount: 5000,
+    );
     await repo.addDebtEntry(ali, 'recu', 1500);
     final fournisseur = await repo.saveParty(
-        name: 'Grossiste', kind: 'fournisseur', initialKind: 'dette', initialAmount: 12000);
+      name: 'Grossiste',
+      kind: 'fournisseur',
+      initialKind: 'dette',
+      initialAmount: 12000,
+    );
     await repo.addDebtEntry(fournisseur, 'paye', 2000);
 
     // Caisse
@@ -87,7 +103,9 @@ void main() {
     expect((await repo.summary()).stockValue, 40 * 80);
 
     // Toutes les écritures sont à synchroniser
-    final dirty = await AppDb.instance.db.rawQuery('SELECT COUNT(*) AS n FROM stock_movements WHERE dirty = 1');
+    final dirty = await AppDb.instance.db.rawQuery(
+      'SELECT COUNT(*) AS n FROM stock_movements WHERE dirty = 1',
+    );
     expect(dirty.first['n'], greaterThan(0));
   });
 
@@ -101,7 +119,11 @@ void main() {
   test('rapport PDF généré (texte arabe compris)', () async {
     await repo.saveProduct(name: 'Thé vert', unitId: 'u-paquet', purchasePrice: 150, qty: 24);
     await repo.saveParty(name: 'محمد', kind: 'client', initialKind: 'credit', initialAmount: 800);
-    final bytes = await buildReport(await repo.summary(), shopName: 'Boutique test', date: DateTime(2026, 10, 5));
+    final bytes = await buildReport(
+      await repo.summary(),
+      shopName: 'Boutique test',
+      date: DateTime(2026, 10, 5),
+    );
     expect(bytes.length, greaterThan(1000));
     expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
   });

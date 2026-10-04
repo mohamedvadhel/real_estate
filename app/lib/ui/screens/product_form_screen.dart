@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models.dart';
 import '../../data/repo.dart';
+import '../../i18n.dart';
 import '../format.dart';
 import '../widgets/common.dart';
 import 'units_screen.dart';
@@ -72,7 +73,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     final qty = parseNum(_qty.text);
     final unit = _unit;
     if (unit != null && !unit.allowDecimal && qty != null && qty != qty.roundToDouble()) {
-      toast(context, "L'unité « ${unit.name} » n'accepte pas de décimales");
+      toast(
+        context,
+        t(
+          "L'unité « ${unit.displayName} » n'accepte pas de décimales",
+          'الوحدة « ${unit.displayName} » لا تقبل الكسور',
+        ),
+      );
       return false;
     }
     await Repo.instance.saveProduct(
@@ -104,7 +111,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     setState(() => _savedCount++);
     _loadLists();
     _nameFocus.requestFocus();
-    toast(context, 'Produit enregistré ($_savedCount)');
+    toast(context, t('Produit enregistré ($_savedCount)', 'تم حفظ المنتج ($_savedCount)'));
   }
 
   Future<void> _addUnit() async {
@@ -116,11 +123,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sym = _unit?.symbol ?? '';
+    final sym = _unit?.displaySymbol ?? '';
+    final per = sym.isEmpty ? t('unité', 'وحدة') : sym;
     final qty = parseNum(_qty.text) ?? 0;
     final price = parseNum(_purchase.text) ?? 0;
+    const gap = SizedBox(height: 14);
     return Scaffold(
-      appBar: AppBar(title: Text(_editing ? 'Modifier le produit' : 'Nouveau produit')),
+      appBar: AppBar(
+        title: Text(
+          _editing ? t('Modifier le produit', 'تعديل المنتج') : t('Nouveau produit', 'منتج جديد'),
+        ),
+      ),
       body: Form(
         key: _form,
         child: ListView(
@@ -131,98 +144,114 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               focusNode: _nameFocus,
               autofocus: !_editing,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Nom du produit *'),
-              validator: (v) => (v ?? '').trim().isEmpty ? 'Obligatoire' : null,
+              decoration: InputDecoration(labelText: t('Nom du produit *', 'اسم المنتج *')),
+              validator: (v) => (v ?? '').trim().isEmpty ? t('Obligatoire', 'إلزامي') : null,
             ),
-            const SizedBox(height: 12),
+            gap,
             Autocomplete<String>(
               textEditingController: _category,
               focusNode: _categoryFocus,
-              optionsBuilder: (v) => _categories
-                  .where((c) => c.toLowerCase().contains(v.text.toLowerCase()) && c != v.text),
+              optionsBuilder: (v) => _categories.where(
+                (c) => c.toLowerCase().contains(v.text.toLowerCase()) && c != v.text,
+              ),
               fieldViewBuilder: (context, ctrl, focus, _) => TextFormField(
                 controller: ctrl,
                 focusNode: focus,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                    labelText: 'Catégorie (facultatif)', hintText: 'Ex. Alimentation, Boissons'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _unitId,
-                  key: ValueKey('unit-$_unitId-${_units.length}'),
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Unité de mesure *'),
-                  items: [
-                    for (final u in _units) DropdownMenuItem(value: u.id, child: Text(u.label)),
-                  ],
-                  onChanged: (v) => setState(() => _unitId = v),
-                  validator: (v) => v == null ? 'Obligatoire' : null,
+                decoration: InputDecoration(
+                  labelText: t('Catégorie (facultatif)', 'الفئة (اختياري)'),
+                  hintText: t('Ex. Alimentation, Boissons', 'مثال: مواد غذائية، مشروبات'),
                 ),
               ),
-              IconButton(
-                tooltip: 'Nouvelle unité',
-                onPressed: _addUnit,
-                icon: const Icon(Icons.add_circle_outline),
-              ),
-            ]),
-            const SizedBox(height: 12),
+            ),
+            gap,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _unitId,
+                    key: ValueKey('unit-$_unitId-${_units.length}'),
+                    isExpanded: true,
+                    decoration: InputDecoration(labelText: t('Unité de mesure *', 'وحدة القياس *')),
+                    items: [
+                      for (final u in _units) DropdownMenuItem(value: u.id, child: Text(u.label)),
+                    ],
+                    onChanged: (v) => setState(() => _unitId = v),
+                    validator: (v) => v == null ? t('Obligatoire', 'إلزامي') : null,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  tooltip: t('Nouvelle unité', 'وحدة جديدة'),
+                  onPressed: _addUnit,
+                  icon: const Icon(Icons.add),
+                  style: IconButton.styleFrom(minimumSize: const Size(52, 52)),
+                ),
+              ],
+            ),
+            gap,
             NumberField(
               controller: _qty,
-              label: 'Quantité en stock',
+              label: t('Quantité en stock', 'الكمية في المخزون'),
               suffix: sym,
-              helper: 'Calcul possible : 3x50+20',
+              helper: t('Calcul possible : 3x50+20', 'يمكن الحساب: 3x50+20'),
               onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: 12),
-            NumberField(
-              controller: _purchase,
-              label: "Prix d'achat par ${sym.isEmpty ? 'unité' : sym}",
-              suffix: 'MRU',
-              onChanged: (_) => setState(() {}),
+            gap,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: NumberField(
+                    controller: _purchase,
+                    label: t("Prix d'achat / $per", 'سعر الشراء / $per'),
+                    suffix: currency,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: NumberField(
+                    controller: _sale,
+                    label: t('Prix de vente / $per', 'سعر البيع / $per'),
+                    suffix: currency,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            NumberField(
-              controller: _sale,
-              label: 'Prix de vente par ${sym.isEmpty ? 'unité' : sym}',
-              suffix: 'MRU',
-            ),
-            const SizedBox(height: 12),
+            gap,
             NumberField(
               controller: _minStock,
-              label: "Seuil d'alerte (facultatif)",
+              label: t("Seuil d'alerte (facultatif)", 'حد التنبيه (اختياري)'),
               suffix: sym,
-              helper: 'Alerte quand le stock descend à ce niveau',
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _note,
-              decoration: const InputDecoration(labelText: 'Note (facultatif)'),
-            ),
-            const SizedBox(height: 16),
-            Card(
-              margin: EdgeInsets.zero,
-              child: ListTile(
-                title: const Text('Valeur de ce stock'),
-                trailing: Text(fmtMoney(qty > 0 ? qty * price : 0),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              helper: t(
+                'Alerte quand le stock descend à ce niveau',
+                'تنبيه عندما ينزل المخزون إلى هذا الحد',
               ),
             ),
+            gap,
+            TextFormField(
+              controller: _note,
+              decoration: InputDecoration(labelText: t('Note (facultatif)', 'ملاحظة (اختياري)')),
+            ),
             const SizedBox(height: 16),
+            TotalBanner(
+              label: t('Valeur de ce stock', 'قيمة هذا المخزون'),
+              value: fmtMoney(qty > 0 ? qty * price : 0),
+            ),
+            const SizedBox(height: 8),
             FilledButton(
               onPressed: _saveAndClose,
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              child: const Text('Enregistrer'),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              child: Text(t('Enregistrer', 'حفظ')),
             ),
             if (!_editing) ...[
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed: _saveAndNext,
-                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                child: const Text('Enregistrer et saisir le suivant'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                child: Text(t('Enregistrer et saisir le suivant', 'حفظ وإدخال التالي')),
               ),
             ],
           ],

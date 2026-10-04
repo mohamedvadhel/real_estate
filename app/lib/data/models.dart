@@ -1,3 +1,5 @@
+import '../i18n.dart';
+
 double _d(Object? v) => (v as num?)?.toDouble() ?? 0;
 double? _dn(Object? v) => (v as num?)?.toDouble();
 
@@ -5,18 +7,22 @@ class Unit {
   Unit({required this.id, required this.name, required this.symbol, required this.allowDecimal});
 
   factory Unit.fromRow(Map<String, Object?> r) => Unit(
-        id: r['id'] as String,
-        name: r['name'] as String? ?? '',
-        symbol: r['symbol'] as String? ?? '',
-        allowDecimal: (r['allow_decimal'] as int? ?? 1) == 1,
-      );
+    id: r['id'] as String,
+    name: r['name'] as String? ?? '',
+    symbol: r['symbol'] as String? ?? '',
+    allowDecimal: (r['allow_decimal'] as int? ?? 1) == 1,
+  );
 
   final String id;
   final String name;
   final String symbol;
   final bool allowDecimal;
 
-  String get label => symbol.isEmpty || symbol == name ? name : '$name ($symbol)';
+  String get displayName => seedName(id, name);
+  String get displaySymbol => seedSymbol(id, symbol);
+  String get label => displaySymbol.isEmpty || displaySymbol == displayName
+      ? displayName
+      : '$displayName ($displaySymbol)';
 }
 
 class Product {
@@ -34,17 +40,17 @@ class Product {
   });
 
   factory Product.fromRow(Map<String, Object?> r) => Product(
-        id: r['id'] as String,
-        name: r['name'] as String? ?? '',
-        category: r['category'] as String?,
-        unitId: r['unit_id'] as String? ?? '',
-        unitSymbol: r['unit_symbol'] as String? ?? '',
-        purchasePrice: _dn(r['purchase_price']),
-        salePrice: _dn(r['sale_price']),
-        minStock: _dn(r['min_stock']),
-        note: r['note'] as String?,
-        qty: _d(r['qty']),
-      );
+    id: r['id'] as String,
+    name: r['name'] as String? ?? '',
+    category: r['category'] as String?,
+    unitId: r['unit_id'] as String? ?? '',
+    unitSymbol: r['unit_symbol'] as String? ?? '',
+    purchasePrice: _dn(r['purchase_price']),
+    salePrice: _dn(r['sale_price']),
+    minStock: _dn(r['min_stock']),
+    note: r['note'] as String?,
+    qty: _d(r['qty']),
+  );
 
   final String id;
   final String name;
@@ -63,6 +69,9 @@ class Product {
   /// Valeur du stock si tout est vendu au prix de vente.
   double get saleValue => qty > 0 ? qty * (salePrice ?? 0) : 0;
 
+  /// Symbole de l'unité dans la langue courante.
+  String get unit => seedSymbol(unitId, unitSymbol);
+
   bool get missingPurchasePrice => qty > 0 && (purchasePrice == null || purchasePrice == 0);
   bool get lowStock => minStock != null && minStock! > 0 && qty <= minStock!;
 }
@@ -70,40 +79,52 @@ class Product {
 /// Type d'opération sur une dette. Solde positif = la personne nous doit,
 /// solde négatif = nous lui devons.
 class DebtKind {
-  const DebtKind(this.code, this.sign, this.label, this.verb);
+  const DebtKind(this.code, this.sign);
 
   final String code;
   final int sign;
-  final String label;
-  final String verb;
 
-  static const credit = DebtKind('credit', 1, 'Il me doit', 'Ajouter une dette (il me doit)');
-  static const recu = DebtKind('recu', -1, "Il m'a payé", "Il m'a payé");
-  static const dette = DebtKind('dette', -1, 'Je lui dois', 'Ajouter ce que je lui dois');
-  static const paye = DebtKind('paye', 1, "Je l'ai payé", "Je l'ai payé");
+  String get label => switch (code) {
+    'credit' => t('Il me doit', 'عليه لي'),
+    'recu' => t("Il m'a payé", 'دفع لي'),
+    'dette' => t('Je lui dois', 'علي له'),
+    _ => t("Je l'ai payé", 'دفعت له'),
+  };
+
+  static const credit = DebtKind('credit', 1);
+  static const recu = DebtKind('recu', -1);
+  static const dette = DebtKind('dette', -1);
+  static const paye = DebtKind('paye', 1);
 
   static const all = [credit, recu, dette, paye];
 
-  static DebtKind of(String code) =>
-      all.firstWhere((k) => k.code == code, orElse: () => credit);
+  static DebtKind of(String code) => all.firstWhere((k) => k.code == code, orElse: () => credit);
 }
 
-const partyKinds = {'client': 'Client', 'fournisseur': 'Fournisseur', 'autre': 'Autre'};
-
-const stockKindLabels = {
-  'initial': 'Stock de départ',
-  'inventaire': 'Correction inventaire',
-  'entree': 'Entrée (achat)',
-  'sortie': 'Sortie (vente)',
-  'perte': 'Perte / casse',
+Map<String, String> get partyKinds => {
+  'client': t('Client', 'زبون'),
+  'fournisseur': t('Fournisseur', 'مورد'),
+  'autre': t('Autre', 'آخر'),
 };
 
-const accountKinds = {'cash': 'Espèces', 'wallet': 'Wallet', 'banque': 'Banque'};
+Map<String, String> get stockKindLabels => {
+  'initial': t('Stock de départ', 'المخزون الأولي'),
+  'inventaire': t('Correction inventaire', 'تصحيح الجرد'),
+  'entree': t('Entrée (achat)', 'دخول (شراء)'),
+  'sortie': t('Sortie (vente)', 'خروج (بيع)'),
+  'perte': t('Perte / casse', 'تلف / خسارة'),
+};
 
-const accountMovementLabels = {
-  'solde': 'Ajustement du solde',
-  'entree': 'Entrée',
-  'sortie': 'Sortie',
+Map<String, String> get accountKinds => {
+  'cash': t('Espèces', 'نقداً'),
+  'wallet': t('Wallet', 'محفظة إلكترونية'),
+  'banque': t('Banque', 'بنك'),
+};
+
+Map<String, String> get accountMovementLabels => {
+  'solde': t('Ajustement du solde', 'تعديل الرصيد'),
+  'entree': t('Entrée', 'دخول'),
+  'sortie': t('Sortie', 'خروج'),
 };
 
 class Party {
@@ -117,13 +138,13 @@ class Party {
   });
 
   factory Party.fromRow(Map<String, Object?> r) => Party(
-        id: r['id'] as String,
-        name: r['name'] as String? ?? '',
-        kind: r['kind'] as String? ?? 'client',
-        phone: r['phone'] as String?,
-        note: r['note'] as String?,
-        balance: _d(r['balance']),
-      );
+    id: r['id'] as String,
+    name: r['name'] as String? ?? '',
+    kind: r['kind'] as String? ?? 'client',
+    phone: r['phone'] as String?,
+    note: r['note'] as String?,
+    balance: _d(r['balance']),
+  );
 
   final String id;
   final String name;
@@ -145,18 +166,20 @@ class Account {
   });
 
   factory Account.fromRow(Map<String, Object?> r) => Account(
-        id: r['id'] as String,
-        name: r['name'] as String? ?? '',
-        kind: r['kind'] as String? ?? 'cash',
-        position: r['position'] as int? ?? 0,
-        balance: _d(r['balance']),
-      );
+    id: r['id'] as String,
+    name: r['name'] as String? ?? '',
+    kind: r['kind'] as String? ?? 'cash',
+    position: r['position'] as int? ?? 0,
+    balance: _d(r['balance']),
+  );
 
   final String id;
   final String name;
   final String kind;
   final int position;
   final double balance;
+
+  String get displayName => seedName(id, name);
 }
 
 /// Ligne d'historique (mouvement de stock, de dette ou de caisse).
@@ -171,13 +194,13 @@ class Movement {
   });
 
   factory Movement.fromRow(Map<String, Object?> r, {required String amountKey}) => Movement(
-        id: r['id'] as String,
-        amount: _d(r[amountKey]),
-        kind: r['kind'] as String? ?? '',
-        date: DateTime.fromMillisecondsSinceEpoch(r['date'] as int? ?? 0),
-        note: r['note'] as String?,
-        unitCost: _dn(r['unit_cost']),
-      );
+    id: r['id'] as String,
+    amount: _d(r[amountKey]),
+    kind: r['kind'] as String? ?? '',
+    date: DateTime.fromMillisecondsSinceEpoch(r['date'] as int? ?? 0),
+    note: r['note'] as String?,
+    unitCost: _dn(r['unit_cost']),
+  );
 
   final String id;
   final double amount;
@@ -240,10 +263,12 @@ class Summary {
   /// Bénéfice potentiel si tout le stock est vendu au prix de vente.
   double get potentialMargin => stockSaleValue - stockValue;
 
-  List<Party> get debtors => parties.where((p) => p.balance > 0.0001).toList()
-    ..sort((a, b) => b.balance.compareTo(a.balance));
-  List<Party> get creditors => parties.where((p) => p.balance < -0.0001).toList()
-    ..sort((a, b) => a.balance.compareTo(b.balance));
+  List<Party> get debtors =>
+      parties.where((p) => p.balance > 0.0001).toList()
+        ..sort((a, b) => b.balance.compareTo(a.balance));
+  List<Party> get creditors =>
+      parties.where((p) => p.balance < -0.0001).toList()
+        ..sort((a, b) => a.balance.compareTo(b.balance));
   List<Product> get missingPrice => products.where((p) => p.missingPurchasePrice).toList();
   List<Product> get lowStock => products.where((p) => p.lowStock).toList();
 }

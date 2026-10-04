@@ -3,6 +3,9 @@ import 'models.dart';
 
 /// Lectures et écritures métier. Les quantités et soldes ne sont jamais
 /// stockés directement : ils sont la somme des mouvements (historique complet).
+/// Note des soldes de départ (traduite à l'affichage).
+const initialBalanceNote = 'Solde de départ';
+
 class Repo {
   Repo(this._db);
 
@@ -112,8 +115,13 @@ class Repo {
 
   Future<void> deleteProduct(String id) => _db.softDelete('products', id);
 
-  Future<void> addStockMovement(String productId, double qty, String kind,
-      {double? unitCost, String? note}) async {
+  Future<void> addStockMovement(
+    String productId,
+    double qty,
+    String kind, {
+    double? unitCost,
+    String? note,
+  }) async {
     await _db.insert('stock_movements', {
       'product_id': productId,
       'qty': qty,
@@ -131,8 +139,12 @@ class Repo {
   }
 
   Future<List<Movement>> stockMovements(String productId) async {
-    final rows = await _db.db.query('stock_movements',
-        where: 'deleted = 0 AND product_id = ?', whereArgs: [productId], orderBy: 'date DESC');
+    final rows = await _db.db.query(
+      'stock_movements',
+      where: 'deleted = 0 AND product_id = ?',
+      whereArgs: [productId],
+      orderBy: 'date DESC',
+    );
     return rows.map((r) => Movement.fromRow(r, amountKey: 'qty')).toList();
   }
 
@@ -176,7 +188,7 @@ class Repo {
       await _db.update('parties', id, values);
     }
     if (initialKind != null && initialAmount != null && initialAmount > 0) {
-      await addDebtEntry(id, initialKind, initialAmount, note: 'Solde de départ', notifyUi: false);
+      await addDebtEntry(id, initialKind, initialAmount, note: initialBalanceNote, notifyUi: false);
     }
     _db.notify();
     return id;
@@ -185,8 +197,14 @@ class Repo {
   Future<void> deleteParty(String id) => _db.softDelete('parties', id);
 
   /// [kind] : voir [DebtKind]. Le montant est saisi positif, le signe dépend du type.
-  Future<void> addDebtEntry(String partyId, String kind, double amount,
-      {String? note, int? date, bool notifyUi = true}) async {
+  Future<void> addDebtEntry(
+    String partyId,
+    String kind,
+    double amount, {
+    String? note,
+    int? date,
+    bool notifyUi = true,
+  }) async {
     await _db.insert('debt_entries', {
       'party_id': partyId,
       'amount': DebtKind.of(kind).sign * amount.abs(),
@@ -197,8 +215,12 @@ class Repo {
   }
 
   Future<List<Movement>> debtEntries(String partyId) async {
-    final rows = await _db.db.query('debt_entries',
-        where: 'deleted = 0 AND party_id = ?', whereArgs: [partyId], orderBy: 'date DESC');
+    final rows = await _db.db.query(
+      'debt_entries',
+      where: 'deleted = 0 AND party_id = ?',
+      whereArgs: [partyId],
+      orderBy: 'date DESC',
+    );
     return rows.map((r) => Movement.fromRow(r, amountKey: 'amount')).toList();
   }
 
@@ -212,8 +234,9 @@ class Repo {
     FROM accounts a WHERE a.deleted = 0''';
 
   Future<List<Account>> accounts() async {
-    final rows =
-        await _db.db.rawQuery('$_accountSelect ORDER BY a.position, a.name COLLATE NOCASE');
+    final rows = await _db.db.rawQuery(
+      '$_accountSelect ORDER BY a.position, a.name COLLATE NOCASE',
+    );
     return rows.map(Account.fromRow).toList();
   }
 
@@ -233,8 +256,12 @@ class Repo {
 
   Future<void> deleteAccount(String id) => _db.softDelete('accounts', id);
 
-  Future<void> addAccountMovement(String accountId, String kind, double amount,
-      {String? note}) async {
+  Future<void> addAccountMovement(
+    String accountId,
+    String kind,
+    double amount, {
+    String? note,
+  }) async {
     await _db.insert('account_movements', {
       'account_id': accountId,
       'amount': amount,
@@ -252,8 +279,12 @@ class Repo {
   }
 
   Future<List<Movement>> accountMovements(String accountId) async {
-    final rows = await _db.db.query('account_movements',
-        where: 'deleted = 0 AND account_id = ?', whereArgs: [accountId], orderBy: 'date DESC');
+    final rows = await _db.db.query(
+      'account_movements',
+      where: 'deleted = 0 AND account_id = ?',
+      whereArgs: [accountId],
+      orderBy: 'date DESC',
+    );
     return rows.map((r) => Movement.fromRow(r, amountKey: 'amount')).toList();
   }
 

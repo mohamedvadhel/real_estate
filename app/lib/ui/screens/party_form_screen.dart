@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models.dart';
 import '../../data/repo.dart';
+import '../../i18n.dart';
 import '../format.dart';
 import '../widgets/common.dart';
 
@@ -53,8 +54,11 @@ class _PartyFormScreenState extends State<PartyFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const gap = SizedBox(height: 14);
     return Scaffold(
-      appBar: AppBar(title: Text(_editing ? 'Modifier' : 'Nouvelle personne')),
+      appBar: AppBar(
+        title: Text(_editing ? t('Modifier', 'تعديل') : t('Nouvelle dette', 'دين جديد')),
+      ),
       body: Form(
         key: _form,
         child: ListView(
@@ -62,7 +66,8 @@ class _PartyFormScreenState extends State<PartyFormScreen> {
           children: [
             SegmentedButton<String>(
               segments: [
-                for (final e in partyKinds.entries) ButtonSegment(value: e.key, label: Text(e.value)),
+                for (final e in partyKinds.entries)
+                  ButtonSegment(value: e.key, label: Text(e.value)),
               ],
               selected: {_kind},
               onSelectionChanged: (s) => setState(() {
@@ -73,45 +78,50 @@ class _PartyFormScreenState extends State<PartyFormScreen> {
                 }
               }),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             TextFormField(
               controller: _name,
               autofocus: !_editing,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Nom *'),
-              validator: (v) => (v ?? '').trim().isEmpty ? 'Obligatoire' : null,
+              decoration: InputDecoration(labelText: t('Nom *', 'الاسم *')),
+              validator: (v) => (v ?? '').trim().isEmpty ? t('Obligatoire', 'إلزامي') : null,
             ),
-            const SizedBox(height: 12),
+            gap,
             TextFormField(
               controller: _phone,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Téléphone (facultatif)'),
+              decoration: InputDecoration(
+                labelText: t('Téléphone (facultatif)', 'الهاتف (اختياري)'),
+              ),
             ),
-            const SizedBox(height: 12),
+            gap,
             TextFormField(
               controller: _note,
-              decoration: const InputDecoration(labelText: 'Note (facultatif)'),
+              decoration: InputDecoration(labelText: t('Note (facultatif)', 'ملاحظة (اختياري)')),
             ),
             if (!_editing) ...[
               const SizedBox(height: 24),
-              Text('Montant actuel de la dette', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
+              Text(
+                t('Montant actuel de la dette', 'مبلغ الدين الحالي'),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 10),
               SegmentedButton<String>(
                 segments: [
-                  ButtonSegment(value: DebtKind.credit.code, label: const Text('Il me doit')),
-                  ButtonSegment(value: DebtKind.dette.code, label: const Text('Je lui dois')),
+                  ButtonSegment(value: DebtKind.credit.code, label: Text(DebtKind.credit.label)),
+                  ButtonSegment(value: DebtKind.dette.code, label: Text(DebtKind.dette.label)),
                 ],
                 selected: {_direction},
                 onSelectionChanged: (s) => setState(() => _direction = s.first),
               ),
-              const SizedBox(height: 12),
-              NumberField(controller: _amount, label: 'Montant', suffix: 'MRU'),
+              gap,
+              NumberField(controller: _amount, label: t('Montant', 'المبلغ'), suffix: currency),
             ],
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _save,
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              child: const Text('Enregistrer'),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              child: Text(t('Enregistrer', 'حفظ')),
             ),
           ],
         ),

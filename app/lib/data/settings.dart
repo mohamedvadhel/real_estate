@@ -1,9 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../i18n.dart';
+
 /// Préférences simples de l'application.
 class AppSettings {
-  AppSettings._(this._prefs) : shopName = ValueNotifier(_prefs.getString(_kShop) ?? 'Ma boutique');
+  AppSettings._(this._prefs) : shopName = ValueNotifier(_prefs.getString(_kShop) ?? '') {
+    appLang.value = _prefs.getString(_kLang) ?? 'fr';
+  }
 
   static AppSettings? _instance;
   static AppSettings get instance => _instance!;
@@ -12,13 +16,21 @@ class AppSettings {
       _instance = AppSettings._(await SharedPreferences.getInstance());
 
   static const _kShop = 'shop_name';
+  static const _kLang = 'lang';
 
   final SharedPreferences _prefs;
   final ValueNotifier<String> shopName;
 
+  /// Nom affiché (valeur par défaut traduite si aucun nom n'est saisi).
+  String get displayShopName => shopName.value.isEmpty ? t('Ma boutique', 'متجري') : shopName.value;
+
   Future<void> setShopName(String name) async {
-    final n = name.trim().isEmpty ? 'Ma boutique' : name.trim();
-    shopName.value = n;
-    await _prefs.setString(_kShop, n);
+    shopName.value = name.trim();
+    await _prefs.setString(_kShop, name.trim());
+  }
+
+  Future<void> setLang(String lang) async {
+    appLang.value = lang;
+    await _prefs.setString(_kLang, lang);
   }
 }

@@ -30,6 +30,8 @@ Valeur nette = Stock (prix d'achat) + Caisse et wallets + Ce que les clients me 
 - **Situation** : valeur nette, détail de chaque poste, marge potentielle, alertes (produits sans prix
   d'achat, stock bas).
 - **Rapport PDF** partageable (WhatsApp, e-mail, Téléchargements…). Les noms en arabe sont gérés.
+- **Français / arabe** : choix de la langue dans Réglages (interface de droite à gauche en arabe,
+  rapport PDF dans la langue choisie).
 - **Hors ligne** : tout est enregistré sur le téléphone. Synchronisation automatique avec Neon dès
   qu'une connexion est disponible.
 
@@ -102,4 +104,4 @@ logique). En cas de conflit, la modification la plus récente gagne.
 - Ventes et achats détaillés (mettent à jour le stock, la caisse et les dettes en une seule saisie).
 - Dépenses (loyer, électricité, transport…) et calcul du bénéfice par période.
 - Conditionnements par produit (ex. sac de 50 kg vendu au kg) avec prix différents.
-- Export Excel, interface en arabe, code PIN.
+- Export Excel, code PIN.

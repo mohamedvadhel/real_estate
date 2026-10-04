@@ -1,3 +1,5 @@
+import '../i18n.dart';
+
 /// Formatage des nombres « à la française » : 12 500,5
 String fmtNum(double v, {int decimals = 2}) {
   final neg = v < 0;
@@ -11,22 +13,27 @@ String fmtNum(double v, {int decimals = 2}) {
   }
   final buf = StringBuffer();
   for (var i = 0; i < intPart.length; i++) {
-    if (i > 0 && (intPart.length - i) % 3 == 0) buf.write(' ');
+    // Espace insécable : le nombre reste d'un seul bloc, même dans un texte arabe.
+    if (i > 0 && (intPart.length - i) % 3 == 0) buf.write('\u00A0');
     buf.write(intPart[i]);
   }
   s = buf.toString() + (dec.isEmpty ? '' : ',$dec');
   return neg && s != '0' ? '-$s' : s;
 }
 
-String fmtMoney(double v) => '${fmtNum(v)} MRU';
+String fmtMoney(double v) => '${fmtNum(v)} $currency';
 
-String fmtQty(double v, String unit) => unit.isEmpty ? fmtNum(v, decimals: 3) : '${fmtNum(v, decimals: 3)} $unit';
+String fmtQty(double v, String unit) =>
+    unit.isEmpty ? fmtNum(v, decimals: 3) : '${fmtNum(v, decimals: 3)} $unit';
 
 String _two(int n) => n.toString().padLeft(2, '0');
 
 String fmtDate(DateTime d) => '${_two(d.day)}/${_two(d.month)}/${d.year}';
 
-String fmtDateTime(DateTime d) => '${fmtDate(d)} ${_two(d.hour)}:${_two(d.minute)}';
+String fmtDateTime(DateTime d) => '${fmtDate(d)}\u00A0${_two(d.hour)}:${_two(d.minute)}';
+
+/// Numéro de téléphone affiché d'un seul bloc (ordre conservé en arabe).
+String fmtPhone(String phone) => phone.replaceAll(' ', '\u00A0');
 
 /// Lit un nombre saisi : accepte la virgule, les espaces et un petit calcul
 /// avec + - x * (ex. « 3x50 + 20 » pour 3 sacs de 50 kg et 20 kg en vrac).
@@ -58,4 +65,4 @@ double? parseNum(String? input) {
 }
 
 /// Valeur pré-remplie dans un champ de saisie.
-String numToInput(double? v) => v == null ? '' : fmtNum(v, decimals: 3).replaceAll(' ', '');
+String numToInput(double? v) => v == null ? '' : fmtNum(v, decimals: 3).replaceAll('\u00A0', '');

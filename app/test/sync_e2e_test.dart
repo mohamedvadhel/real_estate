@@ -29,10 +29,17 @@ void main() {
     final (repoA, syncA) = await phone('a');
     expect(await syncA.test(), isNull);
     final riz = await repoA.saveProduct(name: 'Riz', unitId: 'u-kg', purchasePrice: 30, qty: 100);
-    final ali = await repoA.saveParty(name: 'Ali', kind: 'client', initialKind: 'credit', initialAmount: 2000);
+    final ali = await repoA.saveParty(
+      name: 'Ali',
+      kind: 'client',
+      initialKind: 'credit',
+      initialAmount: 2000,
+    );
     await repoA.setAccountBalance('a-cash', 5000);
     expect(await syncA.sync(), isNull);
-    final dirty = await AppDb.instance.db.rawQuery('SELECT COUNT(*) n FROM products WHERE dirty = 1');
+    final dirty = await AppDb.instance.db.rawQuery(
+      'SELECT COUNT(*) n FROM products WHERE dirty = 1',
+    );
     expect(dirty.first['n'], 0);
 
     // Le téléphone B (ou une réinstallation) récupère tout

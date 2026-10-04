@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../data/db.dart';
+import '../i18n.dart';
 
 class SyncState {
   const SyncState({this.running = false, this.lastSync, this.error});
@@ -22,7 +23,9 @@ class SyncState {
 class SyncService {
   SyncService._(this._db, this._prefs) {
     final last = _prefs.getInt(_kLastSync);
-    state.value = SyncState(lastSync: last == null ? null : DateTime.fromMillisecondsSinceEpoch(last));
+    state.value = SyncState(
+      lastSync: last == null ? null : DateTime.fromMillisecondsSinceEpoch(last),
+    );
     _db.onLocalWrite = _scheduleAuto;
   }
 
@@ -73,13 +76,17 @@ class SyncService {
           .timeout(const Duration(seconds: 20));
       return r.statusCode == 200 ? null : _errorOf(r);
     } catch (e) {
-      return 'Connexion impossible : $e';
+      return '${t('Connexion impossible', 'تعذر الاتصال')} : $e';
     }
   }
 
   /// Lance une synchronisation (une seule à la fois). Renvoie null si succès.
   Future<String?> sync() {
-    if (!configured) return Future.value('Serveur non configuré (voir Réglages)');
+    if (!configured) {
+      return Future.value(
+        t('Serveur non configuré (voir Réglages)', 'الخادم غير مُعد (انظر الإعدادات)'),
+      );
+    }
     return _current ??= _run().whenComplete(() => _current = null);
   }
 
@@ -95,8 +102,11 @@ class SyncService {
         final pushed = first ? await _dirtyRows() : <String, List<Map<String, Object?>>>{};
         first = false;
         final r = await http
-            .post(Uri.parse('$serverUrl/api/sync'),
-                headers: _headers, body: jsonEncode({'since': since, 'changes': pushed}))
+            .post(
+              Uri.parse('$serverUrl/api/sync'),
+              headers: _headers,
+              body: jsonEncode({'since': since, 'changes': pushed}),
+            )
             .timeout(const Duration(seconds: 60));
         if (r.statusCode != 200) throw _errorOf(r);
         final body = jsonDecode(r.body) as Map<String, dynamic>;
@@ -109,7 +119,9 @@ class SyncService {
       await _prefs.setInt(_kLastSync, DateTime.now().millisecondsSinceEpoch);
       _db.notify(local: false);
     } catch (e) {
-      error = e is String ? e : 'Hors ligne ou serveur injoignable';
+      error = e is String
+          ? e
+          : t('Hors ligne ou serveur injoignable', 'لا يوجد اتصال أو الخادم غير متاح');
       debugPrint('Synchro échouée : $e');
     }
     final last = _prefs.getInt(_kLastSync);
@@ -122,9 +134,12 @@ class SyncService {
 
   String _errorOf(http.Response r) {
     try {
-      return (jsonDecode(r.body) as Map)['error']?.toString() ?? 'Erreur ${r.statusCode}';
+      if (r.statusCode == 401) return t("Clé d'accès invalide", 'مفتاح الدخول غير صحيح');
+      if (r.statusCode == 404) return t('Adresse du serveur incorrecte', 'عنوان الخادم غير صحيح');
+      return (jsonDecode(r.body) as Map)['error']?.toString() ??
+          '${t('Erreur', 'خطأ')} ${r.statusCode}';
     } catch (_) {
-      return 'Erreur serveur ${r.statusCode}';
+      return '${t('Erreur serveur', 'خطأ في الخادم')} ${r.statusCode}';
     }
   }
 
@@ -143,8 +158,12 @@ class SyncService {
     pushed.forEach((table, rows) {
       for (final r in rows) {
         // Si la ligne a encore changé pendant l'envoi, elle reste à synchroniser.
-        batch.update(table, {'dirty': 0},
-            where: 'id = ? AND updated_at = ?', whereArgs: [r['id'], r['updated_at']]);
+        batch.update(
+          table,
+          {'dirty': 0},
+          where: 'id = ? AND updated_at = ?',
+          whereArgs: [r['id'], r['updated_at']],
+        );
       }
     });
     await batch.commit(noResult: true);
@@ -165,8 +184,12 @@ class SyncService {
             for (final c in cols.entries)
               c.key: c.value == 'INTEGER' ? (raw[c.key] as num?)?.toInt() : raw[c.key],
           };
-          final local = await txn.query(entry.key,
-              columns: ['updated_at', 'dirty'], where: 'id = ?', whereArgs: [row['id']]);
+          final local = await txn.query(
+            entry.key,
+            columns: ['updated_at', 'dirty'],
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
           if (local.isNotEmpty) {
             final localUpdated = local.first['updated_at'] as int;
             final localDirty = local.first['dirty'] == 1;

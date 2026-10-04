@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../data/models.dart';
 import '../../data/repo.dart';
+import '../../i18n.dart';
 import '../format.dart';
+import '../theme.dart';
 import '../widgets/common.dart';
 import 'product_detail_screen.dart';
 import 'product_form_screen.dart';
@@ -22,16 +24,16 @@ class _StockScreenState extends State<StockScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Stock'),
+        title: Text(t('Stock', 'المخزون')),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
+          preferredSize: const Size.fromHeight(64),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: TextField(
               controller: _search,
               onChanged: (v) => setState(() => _query = v),
               decoration: InputDecoration(
-                hintText: 'Rechercher un produit ou une catégorie',
+                hintText: t('Rechercher un produit ou une catégorie', 'ابحث عن منتج أو فئة'),
                 prefixIcon: const Icon(Icons.search),
                 isDense: true,
                 suffixIcon: _query.isEmpty
@@ -49,10 +51,11 @@ class _StockScreenState extends State<StockScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => const ProductFormScreen())),
+        heroTag: null,
+        onPressed: () =>
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductFormScreen())),
         icon: const Icon(Icons.add),
-        label: const Text('Produit'),
+        label: Text(t('Produit', 'منتج')),
       ),
       body: Reactive<List<Product>>(
         load: () => Repo.instance.products(search: _query),
@@ -61,28 +64,24 @@ class _StockScreenState extends State<StockScreen> {
             return EmptyState(
               icon: Icons.inventory_2_outlined,
               text: _query.isEmpty
-                  ? 'Aucun produit.\nAppuyez sur « + Produit » pour saisir votre stock.'
-                  : 'Aucun résultat.',
+                  ? t(
+                      'Aucun produit.\nAppuyez sur « + Produit » pour saisir votre stock.',
+                      'لا توجد منتجات.\nاضغط على « + منتج » لإدخال مخزونك.',
+                    )
+                  : t('Aucun résultat.', 'لا توجد نتائج.'),
             );
           }
           final total = products.fold<double>(0, (a, p) => a + p.stockValue);
-          return Column(children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: Text('${products.length} produits · valeur ${fmtMoney(total)}',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-            ),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.only(bottom: 88),
-                itemCount: products.length,
-                separatorBuilder: (_, _) => const Divider(height: 1),
-                itemBuilder: (context, i) => _ProductTile(product: products[i]),
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 96),
+            children: [
+              TotalBanner(
+                label: t('${products.length} produits', '${products.length} منتج'),
+                value: fmtMoney(total),
               ),
-            ),
-          ]);
+              ListCard(children: [for (final p in products) _ProductTile(product: p)]),
+            ],
+          );
         },
       ),
     );
@@ -97,21 +96,41 @@ class _ProductTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = product;
-    final price = p.purchasePrice == null ? 'prix ?' : fmtMoney(p.purchasePrice!);
+    final price = p.purchasePrice == null ? t('prix ?', 'السعر ؟') : fmtMoney(p.purchasePrice!);
+    final warn = p.missingPurchasePrice || p.lowStock;
     return ListTile(
-      title: Text(p.name),
-      subtitle: Text(
-        '${fmtQty(p.qty, p.unitSymbol)} × $price'
-        '${p.category == null ? '' : ' · ${p.category}'}',
+      leading: Container(
+        width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: (warn ? const Color(0xFFB45309) : brandColor).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: warn
+            ? const Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309))
+            : Text(
+                p.unit,
+                style: const TextStyle(
+                  color: brandColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
       ),
-      leading: p.missingPurchasePrice
-          ? Icon(Icons.warning_amber_rounded, color: Theme.of(context).colorScheme.error)
-          : p.lowStock
-              ? const Icon(Icons.trending_down, color: Colors.orange)
-              : null,
-      trailing: Text(fmtMoney(p.stockValue), style: const TextStyle(fontWeight: FontWeight.w600)),
+      title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(
+        '${fmtQty(p.qty, p.unit)} × $price'
+        '${p.category == null ? '' : '\n${p.category}'}',
+      ),
+      isThreeLine: p.category != null,
+      trailing: Text(fmtMoney(p.stockValue), style: const TextStyle(fontWeight: FontWeight.w700)),
       onTap: () => Navigator.push(
-          context, MaterialPageRoute(builder: (_) => ProductDetailScreen(productId: p.id))),
+        context,
+        MaterialPageRoute(builder: (_) => ProductDetailScreen(productId: p.id)),
+      ),
     );
   }
 }

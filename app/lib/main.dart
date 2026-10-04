@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'data/db.dart';
 import 'data/settings.dart';
+import 'i18n.dart';
 import 'sync/sync_service.dart';
 import 'ui/screens/cash_screen.dart';
 import 'ui/screens/dashboard_screen.dart';
 import 'ui/screens/debts_screen.dart';
 import 'ui/screens/stock_screen.dart';
+import 'ui/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,17 +25,22 @@ class CompteBoutiqueApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D32));
-    return MaterialApp(
-      title: 'Compte Boutique',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: scheme,
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
-        cardTheme: const CardThemeData(margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6)),
+    return ValueListenableBuilder<String>(
+      valueListenable: appLang,
+      builder: (context, lang, _) => MaterialApp(
+        title: 'Compte Boutique',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        locale: Locale(lang),
+        supportedLocales: const [Locale('fr'), Locale('ar')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        // La clé force la reconstruction complète des écrans au changement de langue.
+        home: HomeShell(key: ValueKey(lang)),
       ),
-      home: const HomeShell(),
     );
   }
 }
@@ -46,15 +54,20 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  final _debtsKey = GlobalKey<DebtsScreenState>();
 
-  void _go(int i) => setState(() => _index = i);
+  void _go(int i) {
+    // Les dettes s'ouvrent toujours sur « Tous ».
+    if (i == 2) _debtsKey.currentState?.showAll();
+    setState(() => _index = i);
+  }
 
   @override
   Widget build(BuildContext context) {
     final pages = [
       DashboardScreen(onOpenTab: _go),
       const StockScreen(),
-      const DebtsScreen(),
+      DebtsScreen(key: _debtsKey),
       const CashScreen(),
     ];
     return Scaffold(
@@ -62,11 +75,27 @@ class _HomeShellState extends State<HomeShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: _go,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Situation'),
-          NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Stock'),
-          NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Dettes'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Caisse'),
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.space_dashboard_outlined),
+            selectedIcon: const Icon(Icons.space_dashboard),
+            label: t('Situation', 'الوضعية'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.inventory_2_outlined),
+            selectedIcon: const Icon(Icons.inventory_2),
+            label: t('Stock', 'المخزون'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.people_alt_outlined),
+            selectedIcon: const Icon(Icons.people_alt),
+            label: t('Dettes', 'الديون'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: const Icon(Icons.account_balance_wallet),
+            label: t('Caisse', 'الصندوق'),
+          ),
         ],
       ),
     );
