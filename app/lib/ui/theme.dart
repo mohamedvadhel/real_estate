@@ -66,10 +66,10 @@ ThemeData buildTheme() {
     listTileTheme: ListTileThemeData(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       // Montants à droite des lignes : lisibles (par défaut ils sont très petits).
-      leadingAndTrailingTextStyle: Typography.material2021()
-          .black
-          .bodyLarge
-          ?.copyWith(fontSize: 15, color: const Color(0xFF17201D)),
+      leadingAndTrailingTextStyle: Typography.material2021().black.bodyLarge?.copyWith(
+        fontSize: 15,
+        color: const Color(0xFF17201D),
+      ),
     ),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
   );

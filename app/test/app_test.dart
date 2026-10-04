@@ -1,6 +1,7 @@
 import 'package:compte_boutique/data/db.dart';
 import 'package:compte_boutique/data/models.dart';
 import 'package:compte_boutique/data/repo.dart';
+import 'package:compte_boutique/i18n.dart';
 import 'package:compte_boutique/report/pdf_report.dart';
 import 'package:compte_boutique/ui/format.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -125,6 +126,19 @@ void main() {
       date: DateTime(2026, 10, 5),
     );
     expect(bytes.length, greaterThan(1000));
+    expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+  });
+
+  test('rapport PDF en arabe', () async {
+    appLang.value = 'ar';
+    addTearDown(() => appLang.value = 'fr');
+    await repo.saveProduct(name: 'سكر', unitId: 'u-kg', purchasePrice: 35, qty: 1200);
+    await repo.saveParty(name: 'Ali', kind: 'client', initialKind: 'credit', initialAmount: 3500);
+    final bytes = await buildReport(
+      await repo.summary(),
+      shopName: 'دكان',
+      date: DateTime(2026, 10, 5),
+    );
     expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
   });
 }

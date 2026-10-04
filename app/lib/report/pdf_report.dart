@@ -23,6 +23,10 @@ Future<void> shareReport({required String shopName}) async {
 }
 
 final _arabic = RegExp(r'[؀-ۿݐ-ݿ]');
+final _digit = RegExp(r'[0-9]');
+
+/// Un nombre formaté : chiffres, espaces insécables, virgule, point, deux-points, barre oblique.
+final _number = RegExp(r'[0-9][0-9\u00A0.,:/]*[0-9]|[0-9]');
 
 /// Sens d'écriture d'un texte : RTL s'il contient de l'arabe.
 pw.TextDirection _dirOf(String text) =>
@@ -41,8 +45,51 @@ Future<Uint8List> buildReport(Summary s, {required String shopName, required Dat
   final end = isAr ? pw.Alignment.centerLeft : pw.Alignment.centerRight;
 
   /// Texte qui respecte le sens de chaque langue (noms arabes dans un rapport français et inversement).
-  pw.Widget txt(String text, {pw.TextStyle? style}) =>
-      pw.Text(text, style: style, textDirection: _dirOf(text));
+  ///
+  /// Le moteur PDF inverse les groupes de chiffres (« 3 500 » devient « 500 3 ») dans une phrase
+  /// arabe. On découpe donc la phrase en mots, posés de droite à gauche, et chaque nombre est écrit
+  /// de gauche à droite d'un seul bloc (les milliers sont séparés par un espace insécable).
+  pw.Widget txt(String text, {pw.TextStyle? style}) {
+    if (!_arabic.hasMatch(text) || !_digit.hasMatch(text)) {
+      return pw.Text(text, style: style, textDirection: _dirOf(text));
+    }
+    // Découpe en morceaux « texte » et « nombre » ; chaque nombre est posé de gauche à droite.
+    final parts = <pw.Widget>[];
+    void addText(String part) {
+      final p = part.trim();
+      if (p.isEmpty) return;
+      final dir = _dirOf(p);
+      parts.add(
+        pw.Directionality(
+          textDirection: dir,
+          child: pw.Text(p, style: style, textDirection: dir),
+        ),
+      );
+    }
+
+    var last = 0;
+    for (final m in _number.allMatches(text)) {
+      addText(text.substring(last, m.start));
+      parts.add(
+        pw.Directionality(
+          textDirection: pw.TextDirection.ltr,
+          child: pw.Text(m.group(0)!, style: style, textDirection: pw.TextDirection.ltr),
+        ),
+      );
+      last = m.end;
+    }
+    addText(text.substring(last));
+    // Une ligne (Row) suit le sens de la page : les morceaux sont posés de droite à gauche.
+    return pw.Directionality(
+      textDirection: pw.TextDirection.rtl,
+      child: pw.Row(
+        mainAxisSize: pw.MainAxisSize.min,
+        children: [
+          for (var i = 0; i < parts.length; i++) ...[if (i > 0) pw.SizedBox(width: 4), parts[i]],
+        ],
+      ),
+    );
+  }
 
   pw.Widget title(String text) => pw.Padding(
     padding: const pw.EdgeInsets.only(top: 18, bottom: 6),
@@ -207,13 +254,15 @@ Future<Uint8List> buildReport(Summary s, {required String shopName, required Dat
         if (s.missingPrice.isNotEmpty)
           pw.Padding(
             padding: const pw.EdgeInsets.only(top: 4),
-            child: txt(
+            // Paragraphe libre (noms de produits) : texte simple qui peut aller à la ligne.
+            child: pw.Text(
+              textDirection: isAr ? pw.TextDirection.rtl : pw.TextDirection.ltr,
               '${t("Attention : produit(s) en stock sans prix d'achat (valeur sous-estimée)", 'تنبيه: منتجات بدون سعر شراء (القيمة أقل من الحقيقة)')} : '
               '${s.missingPrice.map((p) => p.name).join('، ')}',
               style: const pw.TextStyle(fontSize: 9, color: PdfColors.red800),
             ),
           ),
-        title(t('Stock (${products.length} produits)', 'المخزون (${products.length} منتج)')),
+        title(t('Stock (${products.length} produits)', 'المخزون · ${products.length} منتج')),
         if (products.isEmpty)
           txt(t('Aucun produit en stock.', 'لا توجد منتجات في المخزون.'))
         else
