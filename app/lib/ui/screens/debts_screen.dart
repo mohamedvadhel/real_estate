@@ -20,6 +20,8 @@ class DebtsScreen extends StatefulWidget {
 
 class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderStateMixin {
   late final TabController _tabs = TabController(length: 3, vsync: this);
+  final _search = TextEditingController();
+  String _query = '';
 
   void showAll() {
     if (_tabs.index != 0) _tabs.index = 0;
@@ -33,6 +35,7 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
   @override
   void dispose() {
     _tabs.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -41,13 +44,41 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
     return Scaffold(
       appBar: AppBar(
         title: Text(t('Dettes', 'الديون')),
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: [
-            Tab(text: t('Tous', 'الكل')),
-            Tab(text: t('On me doit', 'لي عندهم')),
-            Tab(text: t('Je dois', 'علي لهم')),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(64 + kTextTabBarHeight),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: TextField(
+                  controller: _search,
+                  onChanged: (v) => setState(() => _query = v),
+                  decoration: InputDecoration(
+                    hintText: t('Rechercher un nom ou un téléphone', 'ابحث عن اسم أو هاتف'),
+                    prefixIcon: const Icon(Icons.search),
+                    isDense: true,
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () => setState(() {
+                              _search.clear();
+                              _query = '';
+                            }),
+                          ),
+                  ),
+                ),
+              ),
+              TabBar(
+                controller: _tabs,
+                tabs: [
+                  Tab(text: t('Tous', 'الكل')),
+                  Tab(text: t('On me doit', 'لي عندهم')),
+                  Tab(text: t('Je dois', 'علي لهم')),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -58,13 +89,17 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
       ),
       body: Reactive<List<Party>>(
         load: Repo.instance.parties,
-        builder: (context, parties) {
+        builder: (context, all) {
+          // Les totaux restent ceux de toute la boutique ; la recherche ne filtre que les listes.
+          final rec = all.where((p) => p.balance > 0).fold<double>(0, (a, p) => a + p.balance);
+          final pay = all.where((p) => p.balance < 0).fold<double>(0, (a, p) => a - p.balance);
+          final parties = all.where((p) => matchesSearch(_query, p.name, phone: p.phone)).toList();
           final debtors = parties.where((p) => p.balance > 0.0001).toList()
             ..sort((a, b) => b.balance.compareTo(a.balance));
           final creditors = parties.where((p) => p.balance < -0.0001).toList()
             ..sort((a, b) => a.balance.compareTo(b.balance));
-          final rec = debtors.fold<double>(0, (a, p) => a + p.balance);
-          final pay = creditors.fold<double>(0, (a, p) => a - p.balance);
+          final searching = _query.trim().isNotEmpty;
+          final noResult = t('Aucun résultat pour « $_query ».', 'لا توجد نتائج لـ « $_query ».');
           return TabBarView(
             controller: _tabs,
             children: [
@@ -78,6 +113,7 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
                         label: t('On me doit', 'لي عندهم'),
                         value: rec,
                         color: positiveColor,
+                        first: true,
                       ),
                     ),
                     Expanded(
@@ -85,14 +121,17 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
                         label: t('Je dois', 'علي لهم'),
                         value: pay,
                         color: negativeColor,
+                        first: false,
                       ),
                     ),
                   ],
                 ),
-                empty: t(
-                  'Aucune dette enregistrée.\nAppuyez sur « + Nouvelle dette ».',
-                  'لا توجد ديون مسجلة.\nاضغط على « + دين جديد ».',
-                ),
+                empty: searching
+                    ? noResult
+                    : t(
+                        'Aucune dette enregistrée.\nAppuyez sur « + Nouvelle dette ».',
+                        'لا توجد ديون مسجلة.\nاضغط على « + دين جديد ».',
+                      ),
               ),
               _PartyList(
                 parties: debtors,
@@ -102,7 +141,9 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
                   value: fmtMoney(rec),
                   color: positiveColor,
                 ),
-                empty: t("Personne ne vous doit de l'argent.", 'لا أحد مدين لك.'),
+                empty: searching
+                    ? noResult
+                    : t("Personne ne vous doit de l'argent.", 'لا أحد مدين لك.'),
               ),
               _PartyList(
                 parties: creditors,
@@ -112,7 +153,7 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
                   value: fmtMoney(pay),
                   color: negativeColor,
                 ),
-                empty: t('Vous ne devez rien.', 'لست مديناً لأحد.'),
+                empty: searching ? noResult : t('Vous ne devez rien.', 'لست مديناً لأحد.'),
               ),
             ],
           );
@@ -123,15 +164,26 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
 }
 
 class _MiniTotal extends StatelessWidget {
-  const _MiniTotal({required this.label, required this.value, required this.color});
+  const _MiniTotal({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.first,
+  });
 
+  final bool first;
   final String label;
   final double value;
   final Color color;
 
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsetsDirectional.only(start: 16, end: 4, top: 4, bottom: 8),
+    margin: EdgeInsetsDirectional.only(
+      start: first ? 16 : 5,
+      end: first ? 5 : 16,
+      top: 4,
+      bottom: 8,
+    ),
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.08),
@@ -167,7 +219,7 @@ class _PartyList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (parties.isEmpty) return EmptyState(icon: Icons.people_alt_outlined, text: empty);
+    if (parties.isEmpty) return EmptyState(icon: Icons.person_search_outlined, text: empty);
     return ListView(
       padding: const EdgeInsets.only(top: 8, bottom: 96),
       children: [

@@ -38,6 +38,17 @@ void main() {
     });
   });
 
+  test('recherche par nom (accents, variantes arabes) et téléphone', () {
+    expect(matchesSearch('', 'Ali'), isTrue);
+    expect(matchesSearch('ali', 'Mohamed Ali'), isTrue);
+    expect(matchesSearch('helene', 'Hélène'), isTrue);
+    expect(matchesSearch('احمد', 'أحمد سالم'), isTrue);
+    expect(matchesSearch('فاطمه', 'فاطمة'), isTrue);
+    expect(matchesSearch('مُحَمَّد', 'محمد'), isTrue);
+    expect(matchesSearch('4455', 'Ali', phone: '22 33 44 55'), isTrue);
+    expect(matchesSearch('sidi', 'Mohamed Ali', phone: '22 33 44 55'), isFalse);
+  });
+
   test('données de départ : unités et comptes', () async {
     final units = await repo.units();
     expect(units.map((u) => u.symbol), containsAll(['kg', 'L', 'pce', 'sac']));

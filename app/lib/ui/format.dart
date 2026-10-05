@@ -66,3 +66,31 @@ double? parseNum(String? input) {
 
 /// Valeur pré-remplie dans un champ de saisie.
 String numToInput(double? v) => v == null ? '' : fmtNum(v, decimals: 3).replaceAll('\u00A0', '');
+
+const _accents = {
+  'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', //
+  'î': 'i', 'ï': 'i', 'í': 'i', 'ô': 'o', 'ö': 'o', 'ó': 'o', 'ù': 'u', 'û': 'u', //
+  'ü': 'u', 'ú': 'u', 'ç': 'c', 'ÿ': 'y',
+  // Arabe : formes de alif, ta marbuta, alif maqsura.
+  'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ٱ': 'ا', 'ة': 'ه', 'ى': 'ي',
+};
+
+/// Texte normalisé pour la recherche : minuscules, sans accents ni voyelles arabes,
+/// et variantes d'écriture arabes unifiées (أحمد = احمد, فاطمة = فاطمه).
+String normalizeSearch(String s) {
+  final lower = s.toLowerCase().replaceAll(RegExp('[ً-ْـ]'), '');
+  final buf = StringBuffer();
+  for (final ch in lower.split('')) {
+    buf.write(_accents[ch] ?? ch);
+  }
+  return buf.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
+/// Vrai si [query] se trouve dans le nom (ou dans le téléphone si on tape des chiffres).
+bool matchesSearch(String query, String name, {String? phone}) {
+  final q = normalizeSearch(query);
+  if (q.isEmpty) return true;
+  if (normalizeSearch(name).contains(q)) return true;
+  final digits = query.replaceAll(RegExp(r'\D'), '');
+  return digits.length >= 2 && (phone ?? '').replaceAll(RegExp(r'\D'), '').contains(digits);
+}
