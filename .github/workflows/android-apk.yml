@@ -30,7 +30,7 @@ jobs:
 
       - run: flutter pub get
       - run: flutter analyze
-      - run: flutter test test/app_test.dart
+      - run: flutter test test/app_test.dart test/debts_focus_test.dart
 
       # Clé de signature stable (facultatif mais recommandé : permet de mettre
       # l'app à jour sans la désinstaller). Secrets : ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD
