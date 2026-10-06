@@ -7,6 +7,11 @@ import { ensureSchema } from '../lib/db.js';
 
 const url = process.env.TEST_DATABASE_URL;
 
+// Garde-fou : ce test VIDE la base. Il ne tourne que sur un PostgreSQL local, jamais sur Neon / la prod.
+if (url && (!/localhost|127\.0\.0\.1|%2F|@\//.test(url) || /neon\.tech/.test(url) || url === process.env.DATABASE_URL)) {
+  throw new Error('TEST_DATABASE_URL doit pointer vers un PostgreSQL local (jamais la base de production).');
+}
+
 test('push / pull avec « le plus récent gagne »', { skip: !url }, async () => {
   const pool = new pg.Pool({ connectionString: url });
   await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public');

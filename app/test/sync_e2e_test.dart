@@ -12,6 +12,12 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 final _url = Platform.environment['SYNC_TEST_URL'];
 
+/// Garde-fou : ce test écrit des données de test. Uniquement sur un serveur local, jamais la prod.
+bool get _isLocal {
+  final host = Uri.tryParse(_url ?? '')?.host ?? '';
+  return host == 'localhost' || host == '127.0.0.1';
+}
+
 /// Simule un téléphone : sa propre base et ses propres préférences.
 Future<(Repo, SyncService)> phone(String name) async {
   SharedPreferences.setMockInitialValues({});
@@ -25,45 +31,51 @@ Future<(Repo, SyncService)> phone(String name) async {
 void main() {
   sqfliteFfiInit();
 
-  test('deux téléphones partagent les mêmes données', skip: _url == null, () async {
-    final (repoA, syncA) = await phone('a');
-    expect(await syncA.test(), isNull);
-    final riz = await repoA.saveProduct(name: 'Riz', unitId: 'u-kg', purchasePrice: 30, qty: 100);
-    final ali = await repoA.saveParty(
-      name: 'Ali',
-      kind: 'client',
-      initialKind: 'credit',
-      initialAmount: 2000,
-    );
-    await repoA.setAccountBalance('a-cash', 5000);
-    expect(await syncA.sync(), isNull);
-    final dirty = await AppDb.instance.db.rawQuery(
-      'SELECT COUNT(*) n FROM products WHERE dirty = 1',
-    );
-    expect(dirty.first['n'], 0);
+  test(
+    'deux téléphones partagent les mêmes données',
+    skip: _url == null
+        ? 'SYNC_TEST_URL non défini'
+        : (_isLocal ? false : 'SYNC_TEST_URL doit être local'),
+    () async {
+      final (repoA, syncA) = await phone('a');
+      expect(await syncA.test(), isNull);
+      final riz = await repoA.saveProduct(name: 'Riz', unitId: 'u-kg', purchasePrice: 30, qty: 100);
+      final ali = await repoA.saveParty(
+        name: 'Ali',
+        kind: 'client',
+        initialKind: 'credit',
+        initialAmount: 2000,
+      );
+      await repoA.setAccountBalance('a-cash', 5000);
+      expect(await syncA.sync(), isNull);
+      final dirty = await AppDb.instance.db.rawQuery(
+        'SELECT COUNT(*) n FROM products WHERE dirty = 1',
+      );
+      expect(dirty.first['n'], 0);
 
-    // Le téléphone B (ou une réinstallation) récupère tout
-    final (repoB, syncB) = await phone('b');
-    expect(await syncB.sync(), isNull);
-    var s = await repoB.summary();
-    expect(s.stockValue, 3000);
-    expect(s.receivables, 2000);
-    expect(s.cash, 5000);
-    expect((await repoB.units()).length, 13); // pas de doublon des unités de départ
+      // Le téléphone B (ou une réinstallation) récupère tout
+      final (repoB, syncB) = await phone('b');
+      expect(await syncB.sync(), isNull);
+      var s = await repoB.summary();
+      expect(s.stockValue, 3000);
+      expect(s.receivables, 2000);
+      expect(s.cash, 5000);
+      expect((await repoB.units()).length, 13); // pas de doublon des unités de départ
 
-    // B modifie ; A récupère
-    await repoB.addDebtEntry(ali, 'recu', 500);
-    await repoB.setStockQty(riz, 90);
-    expect(await syncB.sync(), isNull);
-    expect(await syncA.sync(), isNull);
-    s = await repoA.summary();
-    expect(s.receivables, 1500);
-    expect(s.stockValue, 2700);
+      // B modifie ; A récupère
+      await repoB.addDebtEntry(ali, 'recu', 500);
+      await repoB.setStockQty(riz, 90);
+      expect(await syncB.sync(), isNull);
+      expect(await syncA.sync(), isNull);
+      s = await repoA.summary();
+      expect(s.receivables, 1500);
+      expect(s.stockValue, 2700);
 
-    // Suppression propagée
-    await repoA.deleteParty(ali);
-    expect(await syncA.sync(), isNull);
-    expect(await syncB.sync(), isNull);
-    expect((await repoB.summary()).receivables, 0);
-  });
+      // Suppression propagée
+      await repoA.deleteParty(ali);
+      expect(await syncA.sync(), isNull);
+      expect(await syncB.sync(), isNull);
+      expect((await repoB.summary()).receivables, 0);
+    },
+  );
 }

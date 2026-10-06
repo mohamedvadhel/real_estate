@@ -71,6 +71,11 @@ base64 -w0 release.jks   # → ANDROID_KEYSTORE_BASE64
 
 ## Développement
 
+> **Production : ne jamais lancer de test contre la base Neon ou l'API Vercel.**
+> Les tests automatiques (et le workflow GitHub) utilisent une base SQLite en mémoire et
+> n'appellent aucun serveur. Les deux tests d'intégration optionnels refusent de démarrer si
+> `TEST_DATABASE_URL` / `SYNC_TEST_URL` ne pointe pas vers une machine locale.
+
 ```bash
 # Application
 cd app && flutter pub get && flutter test test/app_test.dart && flutter run
