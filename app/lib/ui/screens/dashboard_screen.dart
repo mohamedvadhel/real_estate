@@ -202,9 +202,11 @@ class _NetCard extends StatelessWidget {
             children: [
               const Icon(Icons.storefront_outlined, color: white, size: 20),
               const SizedBox(width: 8),
-              Text(
-                t('Valeur nette de la boutique', 'القيمة الصافية للمتجر'),
-                style: const TextStyle(color: white, fontSize: 15),
+              Expanded(
+                child: Text(
+                  t('Valeur nette de la boutique', 'القيمة الصافية للمتجر'),
+                  style: const TextStyle(color: white, fontSize: 15),
+                ),
               ),
             ],
           ),

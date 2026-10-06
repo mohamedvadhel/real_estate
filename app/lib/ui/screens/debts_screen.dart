@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../data/models.dart';
@@ -23,19 +25,49 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
   final _search = TextEditingController();
   String _query = '';
 
+  /// Personne à montrer dans la liste « Tous » au retour d'une saisie.
+  String? _focusId;
+  final _focusKey = GlobalKey();
+  bool _focusScrolled = false;
+  Timer? _focusTimer;
+
   void showAll() {
     if (_tabs.index != 0) _tabs.index = 0;
   }
 
   Future<void> _open(Widget page) async {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
-    if (mounted) showAll();
+    final result = await Navigator.push<String>(context, MaterialPageRoute(builder: (_) => page));
+    if (!mounted) return;
+    showAll();
+    if (result == null) return;
+    setState(() {
+      // Une nouvelle personne peut ne pas correspondre à la recherche en cours.
+      if (page is PartyFormScreen) {
+        _search.clear();
+        _query = '';
+      }
+      _focusId = result;
+      _focusScrolled = false;
+    });
+  }
+
+  /// Fait défiler la liste jusqu'à la personne puis retire le surlignage après quelques secondes.
+  void _scrollToFocus() {
+    final ctx = _focusKey.currentContext;
+    if (_focusId == null || _focusScrolled || ctx == null) return;
+    _focusScrolled = true;
+    Scrollable.ensureVisible(ctx, alignment: 0.3, duration: const Duration(milliseconds: 350));
+    _focusTimer?.cancel();
+    _focusTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _focusId = null);
+    });
   }
 
   @override
   void dispose() {
     _tabs.dispose();
     _search.dispose();
+    _focusTimer?.cancel();
     super.dispose();
   }
 
@@ -99,6 +131,10 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
           final creditors = parties.where((p) => p.balance < -0.0001).toList()
             ..sort((a, b) => a.balance.compareTo(b.balance));
           final searching = _query.trim().isNotEmpty;
+          // Les données arrivent après le retour : on défile dès que la ligne existe.
+          if (_focusId != null && !_focusScrolled) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
+          }
           final noResult = t('Aucun résultat pour « $_query ».', 'لا توجد نتائج لـ « $_query ».');
           return TabBarView(
             controller: _tabs,
@@ -106,6 +142,8 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
               _PartyList(
                 parties: parties,
                 onOpen: _open,
+                focusId: _focusId,
+                focusKey: _focusKey,
                 header: Row(
                   children: [
                     Expanded(
@@ -210,6 +248,8 @@ class _PartyList extends StatelessWidget {
     required this.empty,
     required this.header,
     required this.onOpen,
+    this.focusId,
+    this.focusKey,
   });
 
   final List<Party> parties;
@@ -217,51 +257,62 @@ class _PartyList extends StatelessWidget {
   final Widget header;
   final Future<void> Function(Widget page) onOpen;
 
+  /// Ligne surlignée (et repérée par [focusKey] pour y faire défiler la liste).
+  final String? focusId;
+  final GlobalKey? focusKey;
+
   @override
   Widget build(BuildContext context) {
     if (parties.isEmpty) return EmptyState(icon: Icons.person_search_outlined, text: empty);
-    return ListView(
+    // Toutes les lignes sont construites : on peut faire défiler jusqu'à n'importe laquelle.
+    return SingleChildScrollView(
       padding: const EdgeInsets.only(top: 8, bottom: 96),
-      children: [
-        header,
-        ListCard(
-          children: [
-            for (final p in parties)
-              ListTile(
-                leading: InitialAvatar(p.name, color: moneyColor(context, p.balance)),
-                title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                  [
-                    partyKinds[p.kind] ?? p.kind,
-                    if (p.phone != null) fmtPhone(p.phone!),
-                  ].join(' · '),
-                ),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      fmtMoney(p.balance.abs()),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: moneyColor(context, p.balance),
+      child: Column(
+        children: [
+          header,
+          ListCard(
+            children: [
+              for (final p in parties)
+                ListTile(
+                  key: p.id == focusId ? focusKey : null,
+                  tileColor: p.id == focusId
+                      ? Theme.of(context).colorScheme.primaryContainer
+                      : null,
+                  leading: InitialAvatar(p.name, color: moneyColor(context, p.balance)),
+                  title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                    [
+                      partyKinds[p.kind] ?? p.kind,
+                      if (p.phone != null) fmtPhone(p.phone!),
+                    ].join(' · '),
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        fmtMoney(p.balance.abs()),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: moneyColor(context, p.balance),
+                        ),
                       ),
-                    ),
-                    Text(
-                      p.balance > 0.0001
-                          ? t('me doit', 'عليه لي')
-                          : p.balance < -0.0001
-                          ? t('je lui dois', 'علي له')
-                          : t('soldé', 'مسدد'),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                      Text(
+                        p.balance > 0.0001
+                            ? t('me doit', 'عليه لي')
+                            : p.balance < -0.0001
+                            ? t('je lui dois', 'علي له')
+                            : t('soldé', 'مسدد'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                  onTap: () => onOpen(PartyDetailScreen(partyId: p.id)),
                 ),
-                onTap: () => onOpen(PartyDetailScreen(partyId: p.id)),
-              ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

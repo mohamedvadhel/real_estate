@@ -40,7 +40,7 @@ class _PartyFormScreenState extends State<PartyFormScreen> {
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
-    await Repo.instance.saveParty(
+    final id = await Repo.instance.saveParty(
       id: widget.party?.id,
       name: _name.text,
       kind: _kind,
@@ -49,7 +49,8 @@ class _PartyFormScreenState extends State<PartyFormScreen> {
       initialKind: _editing ? null : _direction,
       initialAmount: _editing ? null : parseNum(_amount.text),
     );
-    if (mounted) Navigator.pop(context);
+    // Renvoie l'id : la liste des dettes défile jusqu'à cette personne.
+    if (mounted) Navigator.pop(context, id);
   }
 
   @override

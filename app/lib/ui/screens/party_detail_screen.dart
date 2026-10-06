@@ -33,7 +33,7 @@ class PartyDetailScreen extends StatelessWidget {
             ? t('Je lui dois', 'علي له')
             : t('Compte soldé', 'الحساب مسدد');
 
-        // Après la saisie, retour à la liste des dettes (onglet « Tous »).
+        // Après la saisie, retour à la liste des dettes (onglet « Tous »), positionnée sur cette personne.
         Future<void> add(DebtKind kind) async {
           final r = await askAmount(
             context,
@@ -45,7 +45,7 @@ class PartyDetailScreen extends StatelessWidget {
           await repo.addDebtEntry(p.id, kind.code, r.value, note: r.note);
           if (!context.mounted) return;
           toast(context, '${kind.label} : ${fmtMoney(r.value)} · ${p.name}');
-          Navigator.pop(context);
+          Navigator.pop(context, p.id);
         }
 
         return Scaffold(
