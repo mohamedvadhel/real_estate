@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../../data/models.dart';
 import '../../data/repo.dart';
+import '../../data/settings.dart';
 import '../../i18n.dart';
 import '../format.dart';
 import '../theme.dart';
+import '../sort.dart';
 import '../widgets/common.dart';
 import 'party_detail_screen.dart';
 import 'party_form_screen.dart';
@@ -76,6 +78,7 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
     return Scaffold(
       appBar: AppBar(
         title: Text(t('Dettes', 'الديون')),
+        actions: const [SortButton(listKey: 'parties', products: false)],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64 + kTextTabBarHeight),
           child: Column(
@@ -119,83 +122,90 @@ class DebtsScreenState extends State<DebtsScreen> with SingleTickerProviderState
         icon: const Icon(Icons.person_add_alt),
         label: Text(t('Nouvelle dette', 'دين جديد')),
       ),
-      body: Reactive<List<Party>>(
-        load: Repo.instance.parties,
-        builder: (context, all) {
-          // Les totaux restent ceux de toute la boutique ; la recherche ne filtre que les listes.
-          final rec = all.where((p) => p.balance > 0).fold<double>(0, (a, p) => a + p.balance);
-          final pay = all.where((p) => p.balance < 0).fold<double>(0, (a, p) => a - p.balance);
-          final parties = all.where((p) => matchesSearch(_query, p.name, phone: p.phone)).toList();
-          final debtors = parties.where((p) => p.balance > 0.0001).toList()
-            ..sort((a, b) => b.balance.compareTo(a.balance));
-          final creditors = parties.where((p) => p.balance < -0.0001).toList()
-            ..sort((a, b) => a.balance.compareTo(b.balance));
-          final searching = _query.trim().isNotEmpty;
-          // Les données arrivent après le retour : on défile dès que la ligne existe.
-          if (_focusId != null && !_focusScrolled) {
-            WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
-          }
-          final noResult = t('Aucun résultat pour « $_query ».', 'لا توجد نتائج لـ « $_query ».');
-          return TabBarView(
-            controller: _tabs,
-            children: [
-              _PartyList(
-                parties: parties,
-                onOpen: _open,
-                focusId: _focusId,
-                focusKey: _focusKey,
-                header: Row(
-                  children: [
-                    Expanded(
-                      child: _MiniTotal(
-                        label: t('On me doit', 'لي عندهم'),
-                        value: rec,
-                        color: positiveColor,
-                        first: true,
+      body: ValueListenableBuilder<ListSort>(
+        valueListenable: AppSettings.instance.sortFor('parties'),
+        builder: (context, sort, _) => Reactive<List<Party>>(
+          load: Repo.instance.parties,
+          builder: (context, all) {
+            // Les totaux restent ceux de toute la boutique ; la recherche ne filtre que les listes.
+            final rec = all.where((p) => p.balance > 0).fold<double>(0, (a, p) => a + p.balance);
+            final pay = all.where((p) => p.balance < 0).fold<double>(0, (a, p) => a - p.balance);
+            final parties = sortParties(
+              all.where((p) => matchesSearch(_query, p.name, phone: p.phone)).toList(),
+              sort,
+            );
+            final debtors = parties.where((p) => p.balance > 0.0001).toList();
+            final creditors = parties.where((p) => p.balance < -0.0001).toList();
+            final searching = _query.trim().isNotEmpty;
+            // Les données arrivent après le retour : on défile dès que la ligne existe.
+            if (_focusId != null && !_focusScrolled) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
+            }
+            final noResult = t('Aucun résultat pour « $_query ».', 'لا توجد نتائج لـ « $_query ».');
+            return TabBarView(
+              controller: _tabs,
+              children: [
+                _PartyList(
+                  parties: parties,
+                  onOpen: _open,
+                  sort: sort,
+                  focusId: _focusId,
+                  focusKey: _focusKey,
+                  header: Row(
+                    children: [
+                      Expanded(
+                        child: _MiniTotal(
+                          label: t('On me doit', 'لي عندهم'),
+                          value: rec,
+                          color: positiveColor,
+                          first: true,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: _MiniTotal(
-                        label: t('Je dois', 'علي لهم'),
-                        value: pay,
-                        color: negativeColor,
-                        first: false,
+                      Expanded(
+                        child: _MiniTotal(
+                          label: t('Je dois', 'علي لهم'),
+                          value: pay,
+                          color: negativeColor,
+                          first: false,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  empty: searching
+                      ? noResult
+                      : t(
+                          'Aucune dette enregistrée.\nAppuyez sur « + Nouvelle dette ».',
+                          'لا توجد ديون مسجلة.\nاضغط على « + دين جديد ».',
+                        ),
                 ),
-                empty: searching
-                    ? noResult
-                    : t(
-                        'Aucune dette enregistrée.\nAppuyez sur « + Nouvelle dette ».',
-                        'لا توجد ديون مسجلة.\nاضغط على « + دين جديد ».',
-                      ),
-              ),
-              _PartyList(
-                parties: debtors,
-                onOpen: _open,
-                header: TotalBanner(
-                  label: t('Total que les clients me doivent', 'مجموع ما لي عند الزبائن'),
-                  value: fmtMoney(rec),
-                  color: positiveColor,
+                _PartyList(
+                  parties: debtors,
+                  onOpen: _open,
+                  sort: sort,
+                  header: TotalBanner(
+                    label: t('Total que les clients me doivent', 'مجموع ما لي عند الزبائن'),
+                    value: fmtMoney(rec),
+                    color: positiveColor,
+                  ),
+                  empty: searching
+                      ? noResult
+                      : t("Personne ne vous doit de l'argent.", 'لا أحد مدين لك.'),
                 ),
-                empty: searching
-                    ? noResult
-                    : t("Personne ne vous doit de l'argent.", 'لا أحد مدين لك.'),
-              ),
-              _PartyList(
-                parties: creditors,
-                onOpen: _open,
-                header: TotalBanner(
-                  label: t('Total que je dois', 'مجموع ما علي'),
-                  value: fmtMoney(pay),
-                  color: negativeColor,
+                _PartyList(
+                  parties: creditors,
+                  onOpen: _open,
+                  sort: sort,
+                  header: TotalBanner(
+                    label: t('Total que je dois', 'مجموع ما علي'),
+                    value: fmtMoney(pay),
+                    color: negativeColor,
+                  ),
+                  empty: searching ? noResult : t('Vous ne devez rien.', 'لست مديناً لأحد.'),
                 ),
-                empty: searching ? noResult : t('Vous ne devez rien.', 'لست مديناً لأحد.'),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -248,6 +258,7 @@ class _PartyList extends StatelessWidget {
     required this.empty,
     required this.header,
     required this.onOpen,
+    required this.sort,
     this.focusId,
     this.focusKey,
   });
@@ -256,6 +267,7 @@ class _PartyList extends StatelessWidget {
   final String empty;
   final Widget header;
   final Future<void> Function(Widget page) onOpen;
+  final ListSort sort;
 
   /// Ligne surlignée (et repérée par [focusKey] pour y faire défiler la liste).
   final String? focusId;
@@ -282,9 +294,12 @@ class _PartyList extends StatelessWidget {
                   title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Text(
                     [
-                      partyKinds[p.kind] ?? p.kind,
-                      if (p.phone != null) fmtPhone(p.phone!),
-                    ].join(' · '),
+                      [
+                        partyKinds[p.kind] ?? p.kind,
+                        if (p.phone != null) fmtPhone(p.phone!),
+                      ].join(' · '),
+                      ?sortDateLabel(sort, p.createdAt, p.lastActivity, products: false),
+                    ].join('\n'),
                   ),
                   trailing: Column(
                     mainAxisAlignment: MainAxisAlignment.center,

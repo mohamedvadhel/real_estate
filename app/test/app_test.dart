@@ -4,6 +4,7 @@ import 'package:compte_boutique/data/repo.dart';
 import 'package:compte_boutique/i18n.dart';
 import 'package:compte_boutique/report/pdf_report.dart';
 import 'package:compte_boutique/ui/format.dart';
+import 'package:compte_boutique/ui/sort.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -151,5 +152,72 @@ void main() {
       date: DateTime(2026, 10, 5),
     );
     expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+  });
+
+  test('tri : nom, derniers ajoutés, dernière opération, montant', () async {
+    final db = AppDb.instance.db;
+    Future<void> setDates(String table, String id, int created) =>
+        db.update(table, {'created_at': created}, where: 'id = ?', whereArgs: [id]);
+
+    // Clients ajoutés dans l'ordre Brahim (1), Ahmed (2), Cheikh (3).
+    final brahim = await repo.saveParty(
+      name: 'Brahim',
+      kind: 'client',
+      initialKind: 'credit',
+      initialAmount: 900,
+    );
+    final ahmed = await repo.saveParty(
+      name: 'Ahmed',
+      kind: 'client',
+      initialKind: 'credit',
+      initialAmount: 100,
+    );
+    final cheikh = await repo.saveParty(name: 'Cheikh', kind: 'client');
+    await setDates('parties', brahim, 1000);
+    await setDates('parties', ahmed, 2000);
+    await setDates('parties', cheikh, 3000);
+    await db.update('debt_entries', {'date': 1500}, where: 'party_id = ?', whereArgs: [brahim]);
+    await db.update('debt_entries', {'date': 2500}, where: 'party_id = ?', whereArgs: [ahmed]);
+    // Dernière opération : Brahim a payé récemment.
+    await repo.addDebtEntry(brahim, 'recu', 100, date: 9000);
+
+    List<String> names(List<dynamic> l) => [for (final p in l) p.name as String];
+    final parties = await repo.parties();
+    expect(names(sortParties(parties, ListSort.name)), ['Ahmed', 'Brahim', 'Cheikh']);
+    expect(names(sortParties(parties, ListSort.recentAdded)), ['Cheikh', 'Ahmed', 'Brahim']);
+    // Cheikh n'a aucune opération : sa date d'ajout (3000) sert de référence.
+    expect(names(sortParties(parties, ListSort.recentActivity)), ['Brahim', 'Cheikh', 'Ahmed']);
+    expect(names(sortParties(parties, ListSort.amount)), ['Brahim', 'Ahmed', 'Cheikh']);
+    final b = parties.firstWhere((p) => p.id == brahim);
+    expect(b.lastActivity.millisecondsSinceEpoch, 9000);
+    expect(sortDateLabel(ListSort.name, b.createdAt, b.lastActivity, products: false), isNull);
+    expect(
+      sortDateLabel(ListSort.recentActivity, b.createdAt, b.lastActivity, products: false),
+      isNotNull,
+    );
+
+    // Produits : ajoutés Thé (1) puis Sucre (2) ; dernier mouvement sur le thé.
+    final the = await repo.saveProduct(
+      name: 'Thé',
+      unitId: 'u-paquet',
+      purchasePrice: 150,
+      qty: 10,
+    );
+    final sucre = await repo.saveProduct(
+      name: 'Sucre',
+      unitId: 'u-kg',
+      purchasePrice: 35,
+      qty: 100,
+    );
+    await setDates('products', the, 1000);
+    await setDates('products', sucre, 2000);
+    await db.update('stock_movements', {'date': 1000}, where: 'product_id = ?', whereArgs: [the]);
+    await db.update('stock_movements', {'date': 2000}, where: 'product_id = ?', whereArgs: [sucre]);
+    await repo.addStockMovement(the, -2, 'sortie');
+    final products = await repo.products();
+    expect(names(sortProducts(products, ListSort.name)), ['Sucre', 'Thé']);
+    expect(names(sortProducts(products, ListSort.recentAdded)), ['Sucre', 'Thé']);
+    expect(names(sortProducts(products, ListSort.recentActivity)), ['Thé', 'Sucre']);
+    expect(names(sortProducts(products, ListSort.amount)), ['Sucre', 'Thé']); // 3500 > 1200
   });
 }

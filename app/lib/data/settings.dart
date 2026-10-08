@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../i18n.dart';
+import '../ui/sort.dart';
 
 /// Préférences simples de l'application.
 class AppSettings {
@@ -27,6 +28,21 @@ class AppSettings {
   Future<void> setShopName(String name) async {
     shopName.value = name.trim();
     await _prefs.setString(_kShop, name.trim());
+  }
+
+  final _sorts = <String, ValueNotifier<ListSort>>{};
+
+  /// Ordre choisi pour une liste ('products' ou 'parties'), par défaut le nom.
+  ValueNotifier<ListSort> sortFor(String list) => _sorts.putIfAbsent(list, () {
+    final saved = _prefs.getString('sort_$list');
+    return ValueNotifier(
+      ListSort.values.firstWhere((s) => s.name == saved, orElse: () => ListSort.name),
+    );
+  });
+
+  Future<void> setSort(String list, ListSort sort) async {
+    sortFor(list).value = sort;
+    await _prefs.setString('sort_$list', sort.name);
   }
 
   Future<void> setLang(String lang) async {

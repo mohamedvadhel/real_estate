@@ -2,6 +2,7 @@ import '../i18n.dart';
 
 double _d(Object? v) => (v as num?)?.toDouble() ?? 0;
 double? _dn(Object? v) => (v as num?)?.toDouble();
+DateTime _dt(Object? v) => DateTime.fromMillisecondsSinceEpoch((v as num?)?.toInt() ?? 0);
 
 class Unit {
   Unit({required this.id, required this.name, required this.symbol, required this.allowDecimal});
@@ -37,6 +38,8 @@ class Product {
     this.minStock,
     this.note,
     required this.qty,
+    required this.createdAt,
+    required this.lastActivity,
   });
 
   factory Product.fromRow(Map<String, Object?> r) => Product(
@@ -50,6 +53,8 @@ class Product {
     minStock: _dn(r['min_stock']),
     note: r['note'] as String?,
     qty: _d(r['qty']),
+    createdAt: _dt(r['created_at']),
+    lastActivity: _dt(r['last_activity'] ?? r['created_at']),
   );
 
   final String id;
@@ -62,6 +67,12 @@ class Product {
   final double? minStock;
   final String? note;
   final double qty;
+
+  /// Date d'ajout du produit.
+  final DateTime createdAt;
+
+  /// Date du dernier mouvement de stock (ou de l'ajout s'il n'y en a pas).
+  final DateTime lastActivity;
 
   /// Valeur du stock au prix d'achat (ce que la marchandise a coûté).
   double get stockValue => qty > 0 ? qty * (purchasePrice ?? 0) : 0;
@@ -135,6 +146,8 @@ class Party {
     this.phone,
     this.note,
     required this.balance,
+    required this.createdAt,
+    required this.lastActivity,
   });
 
   factory Party.fromRow(Map<String, Object?> r) => Party(
@@ -144,6 +157,8 @@ class Party {
     phone: r['phone'] as String?,
     note: r['note'] as String?,
     balance: _d(r['balance']),
+    createdAt: _dt(r['created_at']),
+    lastActivity: _dt(r['last_activity'] ?? r['created_at']),
   );
 
   final String id;
@@ -154,6 +169,12 @@ class Party {
 
   /// > 0 : il nous doit ; < 0 : nous lui devons.
   final double balance;
+
+  /// Date d'ajout de la personne.
+  final DateTime createdAt;
+
+  /// Date de la dernière opération de dette (ou de l'ajout s'il n'y en a pas).
+  final DateTime lastActivity;
 }
 
 class Account {

@@ -94,3 +94,10 @@ bool matchesSearch(String query, String name, {String? phone}) {
   final digits = query.replaceAll(RegExp(r'\D'), '');
   return digits.length >= 2 && (phone ?? '').replaceAll(RegExp(r'\D'), '').contains(digits);
 }
+
+/// Date courte pour les listes : « 08/10 11:01 » (l'année n'est affichée que si ce n'est pas l'année en cours).
+String fmtShortDateTime(DateTime d) {
+  final time = '${_two(d.hour)}:${_two(d.minute)}';
+  final day = d.year == DateTime.now().year ? '${_two(d.day)}/${_two(d.month)}' : fmtDate(d);
+  return '$day $time';
+}

@@ -44,7 +44,9 @@ class Repo {
   static const _productSelect = '''
     SELECT p.*, u.symbol AS unit_symbol, u.allow_decimal AS unit_allow_decimal,
       COALESCE((SELECT SUM(m.qty) FROM stock_movements m
-                WHERE m.product_id = p.id AND m.deleted = 0), 0) AS qty
+                WHERE m.product_id = p.id AND m.deleted = 0), 0) AS qty,
+      COALESCE((SELECT MAX(m.date) FROM stock_movements m
+                WHERE m.product_id = p.id AND m.deleted = 0), p.created_at) AS last_activity
     FROM products p LEFT JOIN units u ON u.id = p.unit_id
     WHERE p.deleted = 0''';
 
@@ -154,7 +156,9 @@ class Repo {
 
   static const _partySelect = '''
     SELECT p.*, COALESCE((SELECT SUM(d.amount) FROM debt_entries d
-              WHERE d.party_id = p.id AND d.deleted = 0), 0) AS balance
+              WHERE d.party_id = p.id AND d.deleted = 0), 0) AS balance,
+      COALESCE((SELECT MAX(d.date) FROM debt_entries d
+              WHERE d.party_id = p.id AND d.deleted = 0), p.created_at) AS last_activity
     FROM parties p WHERE p.deleted = 0''';
 
   Future<List<Party>> parties() async {

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../data/models.dart';
 import '../../data/repo.dart';
+import '../../data/settings.dart';
 import '../../i18n.dart';
 import '../format.dart';
 import '../theme.dart';
+import '../sort.dart';
 import '../widgets/common.dart';
 import 'product_detail_screen.dart';
 import 'product_form_screen.dart';
@@ -25,6 +27,7 @@ class _StockScreenState extends State<StockScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t('Stock', 'المخزون')),
+        actions: const [SortButton(listKey: 'products', products: true)],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
           child: Padding(
@@ -57,41 +60,48 @@ class _StockScreenState extends State<StockScreen> {
         icon: const Icon(Icons.add),
         label: Text(t('Produit', 'منتج')),
       ),
-      body: Reactive<List<Product>>(
-        load: () => Repo.instance.products(search: _query),
-        builder: (context, products) {
-          if (products.isEmpty) {
-            return EmptyState(
-              icon: Icons.inventory_2_outlined,
-              text: _query.isEmpty
-                  ? t(
-                      'Aucun produit.\nAppuyez sur « + Produit » pour saisir votre stock.',
-                      'لا توجد منتجات.\nاضغط على « + منتج » لإدخال مخزونك.',
-                    )
-                  : t('Aucun résultat.', 'لا توجد نتائج.'),
+      body: ValueListenableBuilder<ListSort>(
+        valueListenable: AppSettings.instance.sortFor('products'),
+        builder: (context, sort, _) => Reactive<List<Product>>(
+          load: () => Repo.instance.products(search: _query),
+          builder: (context, loaded) {
+            final products = sortProducts(loaded, sort);
+            if (products.isEmpty) {
+              return EmptyState(
+                icon: Icons.inventory_2_outlined,
+                text: _query.isEmpty
+                    ? t(
+                        'Aucun produit.\nAppuyez sur « + Produit » pour saisir votre stock.',
+                        'لا توجد منتجات.\nاضغط على « + منتج » لإدخال مخزونك.',
+                      )
+                    : t('Aucun résultat.', 'لا توجد نتائج.'),
+              );
+            }
+            final total = products.fold<double>(0, (a, p) => a + p.stockValue);
+            return ListView(
+              padding: const EdgeInsets.only(bottom: 96),
+              children: [
+                TotalBanner(
+                  label: t('${products.length} produits', '${products.length} منتج'),
+                  value: fmtMoney(total),
+                ),
+                ListCard(
+                  children: [for (final p in products) _ProductTile(product: p, sort: sort)],
+                ),
+              ],
             );
-          }
-          final total = products.fold<double>(0, (a, p) => a + p.stockValue);
-          return ListView(
-            padding: const EdgeInsets.only(bottom: 96),
-            children: [
-              TotalBanner(
-                label: t('${products.length} produits', '${products.length} منتج'),
-                value: fmtMoney(total),
-              ),
-              ListCard(children: [for (final p in products) _ProductTile(product: p)]),
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }
 }
 
 class _ProductTile extends StatelessWidget {
-  const _ProductTile({required this.product});
+  const _ProductTile({required this.product, required this.sort});
 
   final Product product;
+  final ListSort sort;
 
   @override
   Widget build(BuildContext context) {
@@ -122,10 +132,15 @@ class _ProductTile extends StatelessWidget {
       ),
       title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(
-        '${fmtQty(p.qty, p.unit)} × $price'
-        '${p.category == null ? '' : '\n${p.category}'}',
+        [
+          '${fmtQty(p.qty, p.unit)} × $price',
+          if (p.category != null) p.category!,
+          ?sortDateLabel(sort, p.createdAt, p.lastActivity, products: true),
+        ].join('\n'),
       ),
-      isThreeLine: p.category != null,
+      isThreeLine:
+          p.category != null ||
+          sortDateLabel(sort, p.createdAt, p.lastActivity, products: true) != null,
       trailing: Text(fmtMoney(p.stockValue), style: const TextStyle(fontWeight: FontWeight.w700)),
       onTap: () => Navigator.push(
         context,
